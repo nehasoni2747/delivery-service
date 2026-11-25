@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: pricing-eligibility-api
+  jackson:
+    default-property-inclusion: non_null
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: pricing-eligibility-api

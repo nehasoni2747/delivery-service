@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: Pricing and Eligibility API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+paths:
+  /api/v1/pricing/evaluations:
+    post:
+      summary: Evaluate delivery eligibility and price
+      operationId: evaluatePrice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationRequest'
+      responses:
+        '200':
+          description: Evaluation result, including business rejections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+components:
+  schemas:
+    EvaluationRequest:
+      type: object
+      required: [requestId, originPostalCode, destinationPostalCode, weightInGrams, deliveryType]
+      properties:
+        requestId: { type: string, format: uuid }
+        originPostalCode: { type: string, example: '1012 AB' }
+        destinationPostalCode: { type: string, example: '5611EM' }
+        weightInGrams: { type: integer, format: int32, minimum: 1 }
+        deliveryType: { type: string, enum: [STANDARD, NEXT_DAY, SAME_DAY] }
+    EvaluationResponse:
+      type: object
+      required: [requestId, eligible, evaluatedAt]
+      properties:
+        requestId: { type: string, format: uuid }
+        eligible: { type: boolean }
+        price: { $ref: '#/components/schemas/Price' }
+        priceComponents:
+          type: array
+          items: { $ref: '#/components/schemas/PriceComponent' }
+        rejectionCode: { type: string }
+        message: { type: string }
+        evaluatedAt: { type: string, format: date-time }
+    Price:
+      type: object
+      properties:
+        amount: { type: number, example: 8.95 }
+        currency: { type: string, example: EUR }
+    PriceComponent:
+      type: object
+      properties:
+        type: { type: string, enum: [BASE_PRICE, WEIGHT_SURCHARGE, URBAN_AREA_SURCHARGE] }
+        amount: { type: number }
+    ProblemDetails:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        errors: { type: object, additionalProperties: { type: string } }
