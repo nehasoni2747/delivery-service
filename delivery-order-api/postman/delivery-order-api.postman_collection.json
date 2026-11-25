@@ -1,0 +1,202 @@
+{
+  "info": {
+    "name": "Delivery Order API",
+    "description": "Start both APIs and the database first. Run Create order before Replay, Conflict, or Get order. Create generates a fresh idempotency key and saves the returned order ID.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "idempotencyKey", "value": "" },
+    { "key": "orderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Create order",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.collectionVariables.set('idempotencyKey', pm.variables.replaceIn('{{$guid}}'));"]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Created and confirmed', function () {",
+              "    pm.response.to.have.status(201);",
+              "    pm.expect(pm.response.json().status).to.eql('CONFIRMED');",
+              "    pm.expect(pm.response.json().price.amount).to.eql(8.95);",
+              "    pm.expect(pm.response.json().price.currency).to.eql('EUR');",
+              "});",
+              "if (pm.response.code === 201 && pm.response.json().orderId) {",
+              "    pm.collectionVariables.set('orderId', pm.response.json().orderId);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerReference\": \"DEMO-ORDER-001\",\n  \"sender\": {\"name\": \"Sender Example\", \"postalCode\": \"1012 AB\", \"countryCode\": \"NL\"},\n  \"recipient\": {\"name\": \"Recipient Example\", \"postalCode\": \"5611EM\", \"countryCode\": \"NL\"},\n  \"parcel\": {\"weightInGrams\": 2750},\n  \"deliveryType\": \"NEXT_DAY\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/delivery-orders"
+      }
+    },
+    {
+      "name": "Replay same order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Returns the existing order', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().orderId).to.eql(pm.collectionVariables.get('orderId'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerReference\": \"DEMO-ORDER-001\",\n  \"sender\": {\"name\": \"Sender Example\", \"postalCode\": \"1012 AB\", \"countryCode\": \"NL\"},\n  \"recipient\": {\"name\": \"Recipient Example\", \"postalCode\": \"5611EM\", \"countryCode\": \"NL\"},\n  \"parcel\": {\"weightInGrams\": 2750},\n  \"deliveryType\": \"NEXT_DAY\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/delivery-orders"
+      }
+    },
+    {
+      "name": "Conflict - same key, different content",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Rejects changed content', function () {",
+              "    pm.response.to.have.status(409);",
+              "    pm.expect(pm.response.json().title).to.eql('Idempotency conflict');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerReference\": \"DEMO-ORDER-001\",\n  \"sender\": {\"name\": \"Sender Example\", \"postalCode\": \"1012 AB\", \"countryCode\": \"NL\"},\n  \"recipient\": {\"name\": \"Recipient Example\", \"postalCode\": \"5611EM\", \"countryCode\": \"NL\"},\n  \"parcel\": {\"weightInGrams\": 3000},\n  \"deliveryType\": \"NEXT_DAY\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/delivery-orders"
+      }
+    },
+    {
+      "name": "Get order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Retrieves the created order', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().orderId).to.eql(pm.collectionVariables.get('orderId'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/delivery-orders/{{orderId}}"
+      }
+    },
+    {
+      "name": "Reject overweight order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Records a business rejection', function () {",
+              "    pm.response.to.have.status(201);",
+              "    pm.expect(pm.response.json().status).to.eql('REJECTED');",
+              "    pm.expect(pm.response.json().rejectionCode).to.eql('WEIGHT_LIMIT_EXCEEDED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{$guid}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerReference\": \"DEMO-ORDER-HEAVY\",\n  \"sender\": {\"name\": \"Sender Example\", \"postalCode\": \"1012AB\", \"countryCode\": \"NL\"},\n  \"recipient\": {\"name\": \"Recipient Example\", \"postalCode\": \"5611EM\", \"countryCode\": \"NL\"},\n  \"parcel\": {\"weightInGrams\": 20001},\n  \"deliveryType\": \"STANDARD\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/delivery-orders"
+      }
+    },
+    {
+      "name": "Invalid order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Returns validation problem details', function () {",
+              "    pm.response.to.have.status(400);",
+              "    pm.expect(pm.response.json().title).to.eql('Request validation failed');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{$guid}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerReference\": \"DEMO-ORDER-INVALID\",\n  \"sender\": {\"name\": \"Sender Example\", \"postalCode\": \"invalid\", \"countryCode\": \"NL\"},\n  \"recipient\": {\"name\": \"Recipient Example\", \"postalCode\": \"5611EM\", \"countryCode\": \"NL\"},\n  \"parcel\": {\"weightInGrams\": 0},\n  \"deliveryType\": \"STANDARD\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/delivery-orders"
+      }
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actuator/health"
+      }
+    }
+  ]
+}

@@ -44,6 +44,10 @@ curl http://localhost:8080/api/v1/delivery-orders/{orderId}
 
 The pricing API can be evaluated directly with `POST /api/v1/pricing/evaluations`; its request and response models are described by the OpenAPI contract. Business rejections return HTTP 200 with `eligible:false` and a stable rejection code. The order API stores the rejected evaluation as `REJECTED` and returns the resulting order resource. A repeated idempotency key with identical normalized content returns the existing resource; a changed payload returns RFC 9457 Problem Details with HTTP 409.
 
+## Postman collections
+
+Import `delivery-order-api/postman/delivery-order-api.postman_collection.json` and `pricing-eligibility-api/postman/pricing-eligibility-api.postman_collection.json` into Postman. Their `baseUrl` collection variables default to the local ports above and can be changed for another environment. Start the services first; in the order collection, run **Create order** before the replay, conflict, and get requests. Create generates a fresh idempotency key and saves the returned order ID in collection variables.
+
 ## Design and operational assumptions
 
 - Idempotency keys are unique in PostgreSQL. A `PRICING_PENDING` order is committed before the upstream call; this makes concurrent requests converge on one row and avoids keeping a database transaction open over network I/O. Replays can observe `PRICING_PENDING` while the first call is running. A process crash in this brief window leaves a visible pending order; a production deployment should add a monitored recovery worker.

@@ -1,0 +1,128 @@
+{
+  "info": {
+    "name": "Pricing and Eligibility API",
+    "description": "Examples use synthetic data and a new request ID on each call. Business rejections return HTTP 200.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" }
+  ],
+  "item": [
+    {
+      "name": "Eligible next-day evaluation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Returns the expected price', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().eligible).to.eql(true);",
+              "    pm.expect(pm.response.json().price.amount).to.eql(8.95);",
+              "    pm.expect(pm.response.json().price.currency).to.eql('EUR');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012 AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 2750,\n  \"deliveryType\": \"NEXT_DAY\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/pricing/evaluations"
+      }
+    },
+    {
+      "name": "Weight limit rejection",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Returns the weight rejection', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().eligible).to.eql(false);",
+              "    pm.expect(pm.response.json().rejectionCode).to.eql('WEIGHT_LIMIT_EXCEEDED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 20001,\n  \"deliveryType\": \"STANDARD\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/pricing/evaluations"
+      }
+    },
+    {
+      "name": "Same-day route rejection",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Rejects different postal-code areas', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().eligible).to.eql(false);",
+              "    pm.expect(pm.response.json().rejectionCode).to.eql('SAME_DAY_ROUTE_UNAVAILABLE');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 500,\n  \"deliveryType\": \"SAME_DAY\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/pricing/evaluations"
+      }
+    },
+    {
+      "name": "Invalid postal code",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Returns validation problem details', function () {",
+              "    pm.response.to.have.status(400);",
+              "    pm.expect(pm.response.json().title).to.eql('Request validation failed');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"invalid\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 500,\n  \"deliveryType\": \"STANDARD\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/pricing/evaluations"
+      }
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actuator/health"
+      }
+    }
+  ]
+}
